@@ -10,7 +10,7 @@ Since the hotswap is handled at the driver-level, you don't have to handle the "
 import dsndriver "github.com/go-mysql/hotswap-dsn-driver"
 
 // Set hotswap callback function
-dsndriver.SetHotswapFunc(func(ctx context.Context, currenDSN string) (oldDSN string) {
+dsndriver.SetHotswapFunc(func(ctx context.Context, currenDSN string) (newDSN string) {
     // Reload latest DSN and return.
     // Be sure to respect ctx, too.
     return "user:new_pass@tcp(127.0.0.1)/"
