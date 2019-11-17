@@ -2,7 +2,7 @@
 
 [![GoDoc](https://godoc.org/github.com/go-mysql/hotswap-dsn-driver?status.svg)](https://godoc.org/github.com/go-mysql/hotswap-dsn-driver)
   
-This driver is a drop-in replacement for the real [Go MySQL driver](github.com/go-sql-driver/mysql) with one extra feature: it hotswaps the DSN on [MySQL error 1045 (access denied)](https://dev.mysql.com/doc/refman/8.0/en/server-error-reference.html#error_er_access_denied_error). This allows frequently rotating the MySQL password without app downtime or "access denied" errors.
+This driver is a drop-in replacement for the real [Go MySQL driver](https://github.com/go-sql-driver/mysql) with one extra feature: it hotswaps the DSN on [MySQL error 1045 (access denied)](https://dev.mysql.com/doc/refman/8.0/en/server-error-reference.html#error_er_access_denied_error). This allows frequently rotating the MySQL password without app downtime or "access denied" errors.
 
 Since the hotswap is handled at the driver-level, you don't have to handle the "access denied" error everywhere the `*sql.DB` is used. Instead, a single hotswap callback function is set:
 
