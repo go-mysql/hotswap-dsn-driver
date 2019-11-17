@@ -22,6 +22,15 @@
 // To use this driver, it is not necessary to import github.com/go-sql-driver/mysql.
 // This package and github.com/go-sql-driver/mysql can be imported together if
 // the latter is needed for its exported identifiers.
+//
+// The first connection to return MySQL error 1045 (access denied) calls the
+// hotswap function and blocks other failed connections until it returns.
+// Once the hotswap function returns, the first failed connection is retried
+// with the new DSN. Once this returns (successful or not), it unblocks other
+// failed/waiting connections which also retry (in parallel) with the new DSN.
+// If the new DSN works, all connections return successfully to the caller and
+// no errors are reported. If the new DSN does not work, the process is repeated.
+// There is currently no TTL, backoff, or cooldown period between hotswaps.
 package dsndriver
 
 import (
