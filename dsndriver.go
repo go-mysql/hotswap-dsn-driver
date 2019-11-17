@@ -46,7 +46,7 @@ func (d MySQLDriver) Open(dsn string) (driver.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	myc, err := mysql.NewConnector(cfg)
+	myc, err := newConnector(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (d MySQLDriver) OpenConnector(dsn string) (driver.Connector, error) {
 	if err != nil {
 		return nil, err
 	}
-	myc, err := mysql.NewConnector(cfg)
+	myc, err := newConnector(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -99,6 +99,11 @@ func SetHotswapFunc(f func(ctx context.Context, currentDSN string) (newDSN strin
 }
 
 // --------------------------------------------------------------------------
+
+// newConnector returns a new mysql.Connector by default, but for testing
+// we override to return a mockConnector so myc atomic.Value (below) doesn't
+// panic on different data types.
+var newConnector func(*mysql.Config) (driver.Connector, error) = mysql.NewConnector
 
 // connector wraps a mysql.Connector. Both implement driver.Connector.
 type connector struct {
@@ -240,12 +245,13 @@ func (h *connector) Connect(ctx context.Context) (driver.Conn, error) {
 		debug("mysql.ParseDSN error: %s", err)
 		return nil, err
 	}
-	mycNew, err := mysql.NewConnector(cfg)
+	mycNew, err := newConnector(cfg)
 	if err != nil {
 		debug("mysql.NewConnector error: %s", err)
 		return nil, err
 	}
 	h.myc.Store(mycNew) // hot swap the mysql.Connector with the new DSN
+	h.dsn = newDSN      // store new DSN (don't need to guard)
 
 	// Reconnect. DO NOT recurse (h.Connect(ctx)) because we lock and clean up
 	// in the defer func ^, so if we recurse we'll dead lock on our self.
