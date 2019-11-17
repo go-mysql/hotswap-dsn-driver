@@ -30,4 +30,4 @@ When using this driver, you do _not_ need to import github.com/go-sql-driver/mys
 
 The hotswap function is called _only_ for MySQL error 1045. Other errors are ignored. This driver only implements driver- and connector-related interfaces. None of the query-related interfaces are implemented, which means this driver never interferes with queries, transactions, etc.
 
-See the [Go docs](https://godoc.org/github.com/go-mysql/hotswap-dsn-driver?status.svg)](https://godoc.org/github.com/go-mysql/hotswap-dsn-driver) for additional information.
+See the [Go docs](https://godoc.org/github.com/go-mysql/hotswap-dsn-driver) for additional information.
