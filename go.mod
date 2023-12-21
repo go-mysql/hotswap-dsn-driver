@@ -1,4 +1,4 @@
-module github.com/go-mysql/hotswap-dsn-driver
+module github.com/qian-squareup/hotswap-dsn-driver-fallback-test
 
 go 1.19
 
