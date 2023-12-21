@@ -3,16 +3,16 @@
 // replacement for the real Go MySQL driver: github.com/go-sql-driver/mysql.
 // To use this driver:
 //
-//   import dsndriver "github.com/go-mysql/hotswap-dsn-driver"
+//	import dsndriver "github.com/go-mysql/hotswap-dsn-driver"
 //
-//   // Set hot swap callback function only once, at start
-//   dsndriver.SetHotswapFunc(func(ctx context.Context, currentDSN string) (newDSN string) {
-//       // User-provided code to load and return new DSN
-//       // if it has changed, else return an empty string.
-//       return "user:new-pass@tcp(127.0.0.1)/"
-//   })
+//	// Set hot swap callback function only once, at start
+//	dsndriver.SetHotswapFunc(func(ctx context.Context, currentDSN string) (newDSN string) {
+//	    // User-provided code to load and return new DSN
+//	    // if it has changed, else return an empty string.
+//	    return "user:new-pass@tcp(127.0.0.1)/"
+//	})
 //
-//   db, err := sql.Open("mysql-hotswap-dsn", "user:pass@tcp(127.0.0.1)/")
+//	db, err := sql.Open("mysql-hotswap-dsn", "user:pass@tcp(127.0.0.1)/")
 //
 // Then use the db as normal. This driver only implement connection-related
 // interface, and it only hot swaps the DSN by calling the hot sap function
@@ -40,6 +40,7 @@ import (
 	"log"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/go-sql-driver/mysql"
 )
@@ -81,6 +82,15 @@ func (d MySQLDriver) OpenConnector(dsn string) (driver.Connector, error) {
 // a real function to hot swap the DSN.
 var swapper func(context.Context, string) string = nopSwapper
 
+// Determine if we should attempt initiate a hotSwap to fallback after
+// a predetermined amount of time.   This is used in situations where
+// the authentication mechanism changed (i.e. from password to IAM) from the initial
+// 1045 failure but the user prefers to password auth as a mechanism to eventually
+// fallback to password auth from IAM auth.
+var fallback bool
+var fallbackInterval time.Duration
+var fallbackTime time.Time
+
 func nopSwapper(_ context.Context, _ string) string {
 	return ""
 }
@@ -105,6 +115,14 @@ func nopSwapper(_ context.Context, _ string) string {
 // is canceled while it is running.
 func SetHotswapFunc(f func(ctx context.Context, currentDSN string) (newDSN string)) {
 	swapper = f
+}
+
+// --------------------------------------------------------------------------
+func SetHotswapFuncWithFallback(f func(ctx context.Context, currentDSN string) (newDSN string), fallbackInterval time.Duration) {
+	swapper = f
+	fallback = true
+	fallbackInterval = fallbackInterval
+	fallbackTime = time.Now().Add(fallbackInterval)
 }
 
 // --------------------------------------------------------------------------
@@ -168,6 +186,14 @@ func (h *connector) Connect(ctx context.Context) (driver.Conn, error) {
 	// a driver.Conn and we return early--no locking in this pkg.
 	myc := h.myc.Load().(driver.Connector)
 	conn, myerr := myc.Connect(ctx)
+
+	// If fallback is enabled, simulate a 1045 error to fallback to password auth
+	// If connection is valid (IAM) and the scheduled fallbackTime has elapsed.
+	if myerr == nil && fallback && time.Now().After(fallbackTime) {
+		myerr = &mysql.MySQLError{Number: 1045,
+			Message: "",
+		}
+	}
 	if myerr == nil {
 		return conn, nil // conn OK
 	}
@@ -262,6 +288,8 @@ func (h *connector) Connect(ctx context.Context) (driver.Conn, error) {
 	h.myc.Store(mycNew) // hot swap the mysql.Connector with the new DSN
 	h.dsn = newDSN      // store new DSN (don't need to guard)
 
+	// Update the fallback time on successful swaps of dsn
+	fallbackTime = time.Now().Add(fallbackInterval)
 	// Reconnect. DO NOT recurse (h.Connect(ctx)) because we lock and clean up
 	// in the defer func ^, so if we recurse we'll dead lock on our self.
 	return mycNew.Connect(ctx)
